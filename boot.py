@@ -4,7 +4,7 @@ from hcsr04 import HCSR04
 from machine import Pin
 import time
 from utils import *
-from thread import *
+import uasyncio
 
 ###   Définition des variables globales   ###
 
@@ -29,11 +29,6 @@ maxPlace = 3 # nombre de place du parking
 freePlace = 3 # nombre de place disponible au depart
 
 direction = 2 # direction de la voiture, 1 pour voiture entrante, 0 pour voiture sortante et 2 pour aucune
-
-# Déclaration des Threads
-thread_sensor1 = Periodic(lambda : listenSensor(sensor1, state_sensor1))
-thread_sensor2 = Periodic(lambda : listenSensor(sensor2, state_sensor2))
-thread_sensor3 = Periodic(lambda : listenSensor(sensor3, state_sensor3))
 
 ###     Définition des fonctions      ###
 
@@ -62,7 +57,7 @@ def success_sound():
     buzzer.value(0)
 
 # Pour ecouter un sensor
-def listenSensor(sensor, state):
+async def listenSensor(sensor, state):
     old_state = state
     while True:
         distance = sensor.distance_cm()
@@ -81,7 +76,7 @@ def listenSensor(sensor, state):
                 old_state = 0
                 ouvrir() # ouvrir le parking pour que la voiture sorte
                 success_sound()
-        time.sleep_ms(100)
+        await uasyncio.sleep(10)
 
 # Fonction exécutée lorsqu'une voiture est détectée
 def listenCapteur(pin):
@@ -106,7 +101,11 @@ if __name__ == "main":
     pin_capteur = Pin(trigger_pin_capteur, Pin.IN)
     pin_capteur.irq(trigger = Pin.IRQ_RISING, handler = listenCapteur) # listenCapteur sera appellé a chaque foid qu'une voiture sera détectée
 
-    # Initialisation des sensor
-    thread_sensor1.start()
-    thread_sensor2.start()
-    thread_sensor3.start()
+    # Initialisation des coroutines
+    event_loop = uasyncio.get_event_loop()
+    event_loop.create_task(listenSensor(sensor1, state_sensor1))
+    event_loop.create_task(listenSensor(sensor2, state_sensor2))
+    event_loop.create_task(listenSensor(sensor3, state_sensor3))
+
+    # Lancement des coroutines
+    event_loop.run_forever()
